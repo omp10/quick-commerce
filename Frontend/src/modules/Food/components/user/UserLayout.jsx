@@ -15,6 +15,7 @@ import BottomNavigation from "./BottomNavigation"
 import DesktopNavbar from "./DesktopNavbar"
 import { useUserNotifications } from "../../hooks/useUserNotifications"
 import { shouldSkipScrollResetForHome } from "@food/utils/homeScrollRestore"
+import { QC_UI } from "@food/qcFlag"
 
 // Create SearchOverlay context with default value
 const SearchOverlayContext = createContext({
@@ -202,6 +203,9 @@ export default function UserLayout() {
     isProfileRoot ||
     normalizedPath === "" // Handle empty string case for root relative to /food
 
+  // The quick-commerce home draws its own header and bottom nav.
+  const isQcHome = QC_UI && (normalizedPath === "/user" || normalizedPath === "/" || normalizedPath === "")
+
   const isUnder250 = normalizedPath === "/under-250" || normalizedPath === "/user/under-250"
 
   return (
@@ -216,13 +220,13 @@ export default function UserLayout() {
                 {/* <Navbar /> */}
                 {/* Desktop Navbar - Hidden on mobile, visible on medium+ screens */}
                 <div className="hidden md:block">
-                  {showBottomNav && <DesktopNavbar showLogo={!isUnder250} />}
+                  {showBottomNav && !isQcHome && <DesktopNavbar showLogo={!isUnder250} />}
                 </div>
                 {/* <LocationPrompt /> */}
-                <main className={showBottomNav ? "md:pt-40" : ""}>
+                <main className={showBottomNav && !isQcHome ? "md:pt-40" : ""}>
                   <Outlet />
                 </main>
-                {showBottomNav && <BottomNavigation />}
+                {showBottomNav && !isQcHome && <BottomNavigation />}
               </LocationSelectorProvider>
             </SearchOverlayProvider>
           </OrdersProvider>

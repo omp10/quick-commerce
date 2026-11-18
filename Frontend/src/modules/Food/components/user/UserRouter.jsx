@@ -8,6 +8,8 @@ import ProtectedRoute from "@food/components/ProtectedRoute"
 
 // Home & Discovery
 const Home = lazy(() => import("@food/pages/user/Home"))
+const QcHome = lazy(() => import("@food/pages/user/qc/QcHome"))
+import { QC_UI } from "@food/qcFlag"
 const Dining = lazy(() => import("@food/pages/user/Dining"))
 const DiningRestaurants = lazy(() => import("@food/pages/user/DiningRestaurants"))
 const DiningCategory = lazy(() => import("@food/pages/user/DiningCategory"))
@@ -96,7 +98,7 @@ export default function UserRouter() {
       <Routes>
         <Route element={<UserLayout />}>
           {/* Home & Discovery */}
-          <Route path="" element={<Home />} />
+          <Route path="" element={QC_UI ? <QcHome /> : <Home />} />
           <Route path="dining" element={<Dining />} />
           <Route path="dining/restaurants" element={<DiningRestaurants />} />
           <Route path="dining/:category" element={<DiningCategory />} />

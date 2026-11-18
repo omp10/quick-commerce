@@ -82,6 +82,22 @@
   --color-primary-orange: #dc2626;
   --font-poppins: var(--font-poppins);
   --font-outfit: var(--font-outfit);
+
+  /* Appzeto quick-commerce customer UI (qc-*). Namespaced so admin,
+     store and delivery screens are unaffected. Colours come from the logo. */
+  --color-qc-brand: #14a39c;
+  --color-qc-brand-dark: #0f7f7a;
+  --color-qc-brand-soft: #e6f6f5;
+  --color-qc-accent: #5aa832;
+  --color-qc-accent-soft: #eaf6e1;
+  --color-qc-highlight: #ffe14d;
+  --color-qc-highlight-soft: #fff8d6;
+  --color-qc-bg: #f4f6f8;
+  --color-qc-card: #ffffff;
+  --color-qc-line: #e8ebee;
+  --color-qc-ink: #1c1f23;
+  --color-qc-muted: #6b7280;
+  --color-qc-danger: #e5484d;
 }
 
 .dark {
