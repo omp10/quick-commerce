@@ -553,7 +553,11 @@ export const logout = async (refreshToken, fcmToken, platform) => {
   }
 
   // 2. Invalidate the refresh token (standard logout procedure)
-  const deleted = await FoodRefreshToken.deleteOne({ token: refreshToken });
+  // A token still inside its rotation grace window has a live successor; that
+  // one is the session now, so it goes too.
+  const stored = await FoodRefreshToken.findOne({ token: refreshToken }).select("replacedBy").lean();
+  const tokens = [refreshToken, stored?.replacedBy].filter(Boolean);
+  const deleted = await FoodRefreshToken.deleteMany({ token: { $in: tokens } });
   return { invalidated: deleted.deletedCount > 0 };
 };
 
@@ -926,8 +930,10 @@ export const refreshAccessToken = async (token) => {
     throw new ValidationError("Refresh token is required");
   }
 
-  const stored = await FoodRefreshToken.findOne({ token }).lean();
-  if (!stored) {
+  const storedToken = await FoodRefreshToken.findOne({ token }).lean();
+  // expiresAt is checked here too: Mongo's TTL sweep runs about once a minute,
+  // which would otherwise stretch the rotation grace window well past its end.
+  if (!storedToken || new Date(storedToken.expiresAt).getTime() <= Date.now()) {
     throw new AuthError("Invalid refresh token");
   }
 
@@ -971,12 +977,62 @@ export const refreshAccessToken = async (token) => {
     tokenVersion = stored;
   }
 
-  const newAccessToken = signAccessToken({
+  const claims = {
     userId: payload.userId,
     role: payload.role,
     ...(tokenVersion !== undefined ? { tokenVersion } : {}),
     ...(payload.adminType ? { adminType: payload.adminType } : {}),
-  });
+  };
+  const newAccessToken = signAccessToken(claims);
 
-  return { accessToken: newAccessToken, refreshToken: token };
+  const refreshToken = await rotateRefreshToken(storedToken, claims);
+  return { accessToken: newAccessToken, refreshToken };
+};
+
+/** How long a rotated-out refresh token keeps working. */
+const REFRESH_ROTATION_GRACE_MS =
+  Number(process.env.REFRESH_TOKEN_ROTATION_GRACE_SECONDS || 30) * 1000;
+
+/**
+ * Issues a new refresh token in place of [stored] and returns it.
+ *
+ * The old token is not deleted: it stays valid for REFRESH_ROTATION_GRACE_MS so
+ * requests already in flight with it (several API calls hitting 401 together
+ * and each refreshing) still succeed. Every refresh within the grace window gets
+ * the SAME successor, so parallel refreshes cannot fork the session into
+ * several live tokens.
+ */
+const rotateRefreshToken = async (stored, claims) => {
+  if (stored.replacedBy) return stored.replacedBy;
+
+  const nextToken = signRefreshToken(claims);
+  const ttlMs = ms(config.jwtRefreshExpiresIn || "7d");
+
+  // Claim the rotation atomically. Of two concurrent refreshes only one matches
+  // replacedBy: null; the loser reads the winner's successor below.
+  const claimed = await FoodRefreshToken.findOneAndUpdate(
+    { _id: stored._id, replacedBy: null },
+    {
+      $set: {
+        replacedBy: nextToken,
+        expiresAt: new Date(Date.now() + REFRESH_ROTATION_GRACE_MS),
+      },
+    },
+    { new: true },
+  ).lean();
+
+  if (!claimed) {
+    const winner = await FoodRefreshToken.findById(stored._id).select("replacedBy").lean();
+    if (!winner?.replacedBy) throw new AuthError("Invalid refresh token");
+    return winner.replacedBy;
+  }
+
+  await FoodRefreshToken.create({
+    userId: stored.userId,
+    token: nextToken,
+    device: stored.device ?? null,
+    ipAddress: stored.ipAddress ?? null,
+    expiresAt: new Date(Date.now() + ttlMs),
+  });
+  return nextToken;
 };

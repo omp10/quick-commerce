@@ -67,7 +67,11 @@ export const initializeFirebaseRealtime = () => {
         db = admin.database();
         messaging = admin.messaging();
 
-        logger.info('✅ Firebase Realtime Database Initialized Successfully');
+        logger.info(`✅ Firebase Admin initialized for project ${serviceAccount.project_id}`);
+        const expected = sanitizeString(process.env.FIREBASE_PROJECT_ID);
+        if (expected && serviceAccount.project_id !== expected) {
+            logger.error(`Firebase Admin service account is for "${serviceAccount.project_id}", expected "${expected}".`);
+        }
         return { db, messaging };
     } catch (error) {
         logger.error(`❌ Firebase Initialization Error: ${error.message}`);

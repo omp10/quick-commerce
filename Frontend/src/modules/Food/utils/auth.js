@@ -196,6 +196,9 @@ export async function ensureValidAccessToken(module) {
 
         localStorage.setItem(`${module}_accessToken`, newAccessToken);
         localStorage.setItem(`${module}_authenticated`, "true");
+        // The server rotates refresh tokens; the old one dies seconds later.
+        const newRefreshToken = data?.data?.refreshToken || data?.refreshToken;
+        if (newRefreshToken) localStorage.setItem(`${module}_refreshToken`, newRefreshToken);
 
         if (typeof window !== "undefined") {
           window.dispatchEvent(

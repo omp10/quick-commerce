@@ -8,6 +8,7 @@ import { FoodAdmin } from '../admin/admin.model.js';
 import { config } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
 import { isMobilePlatform, normalizePlatform } from '../../utils/platform.js';
+import { rewriteMediaUrl } from '../../middleware/publicMediaUrls.js';
 
 const FIREBASE_MESSAGING_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const OAUTH_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -69,6 +70,13 @@ let cachedAccessTokenExpiryMs = 0;
 let cachedServiceAccount = null;
 
 const sanitizeString = (value) => String(value ?? '').trim();
+
+/**
+ * The Firebase project the server is meant to push through (quick-commerce-8b950).
+ * Optional; when set, a credential for any other project is refused rather than
+ * used, because pushes sent under the wrong project reach no device at all.
+ */
+const getExpectedProjectId = () => sanitizeString(process.env.FIREBASE_PROJECT_ID);
 const normalizeNotificationText = (value) => {
     const raw = sanitizeString(value);
     if (!raw) return '';
@@ -129,6 +137,20 @@ export async function reloadServiceAccountFromSettings() {
         const parsed = JSON.parse(raw);
         if (!parsed?.client_email || !parsed?.private_key) return false;
 
+        // The panel credential outranks the env one, so a stale credential saved
+        // there (e.g. the old versapack-a920f project) silently wins over a new
+        // key put in .env -- every push then goes out under the wrong project and
+        // no app receives it. When the env pins a project, refuse a panel
+        // credential for any other project and fall back to the env one.
+        const expected = getExpectedProjectId();
+        if (expected && sanitizeString(parsed.project_id) !== expected) {
+            logger.error(
+                `Ignoring Firebase service account saved in admin settings: it is for project "${parsed.project_id}", ` +
+                `but FIREBASE_PROJECT_ID is "${expected}". Save the ${expected} service account in the admin panel, or clear it there.`
+            );
+            return false;
+        }
+
         cachedServiceAccount = parsed;
         logger.info(`Firebase service account loaded from admin settings (${parsed.project_id})`);
         return true;
@@ -170,10 +192,18 @@ const getServiceAccountFromEnv = () => {
 
 const getFirebaseProjectId = () => {
     const account = getServiceAccountFromEnv();
+    // The credential's own project first. A service account can only send
+    // through its own project, so taking the id from env (which may still name
+    // the old project) made every send fail with a 403.
     const projectId =
-        sanitizeString(config.firebaseProjectId) ||
         sanitizeString(account.project_id) ||
-        sanitizeString(process.env.FIREBASE_PROJECT_ID);
+        sanitizeString(config.firebaseProjectId);
+    const expected = getExpectedProjectId();
+    if (expected && projectId !== expected) {
+        throw new Error(
+            `Firebase service account is for project "${projectId}", expected "${expected}". Replace the service account.`
+        );
+    }
     if (!projectId) {
         throw new Error('Firebase project ID is not configured.');
     }
@@ -234,21 +264,26 @@ const getFirebaseAccessToken = async () => {
     return cachedAccessToken;
 };
 
+// FCM data values must all be strings. Media URLs are made public https here
+// as in API responses (see middleware/publicMediaUrls.js).
 const normalizeDataMap = (data = {}) => {
+    const base = config.publicMediaBaseUrl;
     const result = {};
     for (const [key, value] of Object.entries(data || {})) {
         if (value === undefined || value === null) continue;
-        result[String(key)] = String(value);
+        result[String(key)] = rewriteMediaUrl(String(value), base);
     }
     return result;
 };
 
 const buildMessagePayload = (payload = {}, token) => {
-    const notification = {
-        title: normalizeNotificationText(payload.title || payload.notification?.title || 'New notification'),
-        body: normalizeNotificationText(payload.body || payload.notification?.body || '')
-    };
     const data = normalizeDataMap(payload.data || {});
+    // data.title/body as fallback: data-only alerts carry their text only in
+    // data, and the webpush block below still needs something to show.
+    const notification = {
+        title: normalizeNotificationText(payload.title || payload.notification?.title || data.title || 'New notification'),
+        body: normalizeNotificationText(payload.body || payload.notification?.body || data.body || '')
+    };
     if (data.title) data.title = normalizeNotificationText(data.title);
     if (data.body) data.body = normalizeNotificationText(data.body);
     const image =
@@ -364,10 +399,28 @@ const parseFirebaseError = async (response) => {
     }
 };
 
+/**
+ * Whether FCM says this token is dead for good.
+ *
+ * UNREGISTERED / 404: the app was uninstalled or the token rotated.
+ * SENDER_ID_MISMATCH: the token belongs to another Firebase project -- every
+ * token minted under the old versapack-a920f project answers this way now.
+ * INVALID_ARGUMENT only when it is about the token: the same code is returned
+ * for a malformed payload, and pruning on that would wipe every token we send to.
+ */
 const shouldRemoveTokenFromError = (errorJson, response) => {
     const status = response?.status;
-    const message = String(errorJson?.error?.message || '').toUpperCase();
-    return status === 404 || message.includes('UNREGISTERED') || message.includes('INVALID_ARGUMENT');
+    const err = errorJson?.error || {};
+    const codes = [
+        String(err.status || ''),
+        ...(Array.isArray(err.details) ? err.details.map((d) => String(d?.errorCode || '')) : []),
+    ].map((c) => c.toUpperCase());
+    const message = String(err.message || '').toUpperCase();
+
+    if (status === 404 || codes.includes('UNREGISTERED') || codes.includes('SENDER_ID_MISMATCH')) return true;
+    if (message.includes('UNREGISTERED') || message.includes('SENDERID MISMATCH') || message.includes('SENDER_ID_MISMATCH')) return true;
+    if (codes.includes('INVALID_ARGUMENT') && message.includes('REGISTRATION TOKEN')) return true;
+    return false;
 };
 
 /** Transient FCM failures worth a retry. Anything else is permanent. */
@@ -589,6 +642,30 @@ const sendMessageWithRetry = async (message, { projectId, accessToken }) => {
     return { ok: false, remove: false, error: lastError?.message || String(lastError) };
 };
 
+/**
+ * Asks FCM whether [token] is live for the current project without delivering
+ * anything (validate_only). Used by scripts/cleanup-fcm-tokens.js.
+ * Returns { ok, dead, error }: dead=true means the token should be deleted.
+ */
+export const probeFirebaseDeviceToken = async (token) => {
+    const projectId = getFirebaseProjectId();
+    const accessToken = await getFirebaseAccessToken();
+    const response = await fetch(FCM_SEND_URL(projectId), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ validate_only: true, message: { token, data: { type: 'probe' } } }),
+    });
+    if (response.ok) return { ok: true, dead: false };
+    const errorJson = await parseFirebaseError(response);
+    return {
+        ok: false,
+        dead: shouldRemoveTokenFromError(errorJson, response),
+        error: errorJson?.error?.message || `HTTP ${response.status}`,
+    };
+};
+
+export const getActiveFirebaseProjectId = () => getFirebaseProjectId();
+
 export const sendPushNotification = async (tokens, payload = {}) => {
     const projectId = getFirebaseProjectId();
     const accessToken = await getFirebaseAccessToken();
@@ -615,6 +692,15 @@ export const sendNotificationToOwner = async ({ ownerType, ownerId, payload, pla
     // Clone payload to avoid side-effects across batched sends.
     const enrichedPayload = { ...payload };
 
+    // The user app routes a tapped notification on data.type + data.orderId.
+    // Guarantee both keys exist so a sender that forgot one still opens a screen.
+    if (String(ownerType || '').toUpperCase() === 'USER') {
+        const data = { ...(payload?.data || {}) };
+        if (!data.type) data.type = 'general';
+        if (!data.orderId && data.orderMongoId) data.orderId = data.orderMongoId;
+        enrichedPayload.data = data;
+    }
+
     const tokens = await listOwnerTokens({ ownerType, ownerId, platform });
     if (!tokens.length) {
         return { successCount: 0, failureCount: 0, results: [] };
@@ -628,17 +714,11 @@ export const sendNotificationToOwner = async ({ ownerType, ownerId, payload, pla
             .map((item) => item.token)
             .filter(Boolean);
         if (invalidTokens.length > 0) {
-            const model = getOwnerModel(ownerType);
-            const doc = model ? await model.findById(ownerId) : null;
-            if (doc) {
-                const fieldNames = platform
-                    ? [getTokenFieldForPlatform(platform)]
-                    : [OWNER_TOKEN_FIELDS.web, OWNER_TOKEN_FIELDS.mobile];
-                for (const field of fieldNames) {
-                    doc[field] = normalizeTokenList((Array.isArray(doc[field]) ? doc[field] : []).filter((t) => !invalidTokens.includes(t)));
-                }
-                await doc.save();
-            }
+            // Dead tokens are dead for every owner, so scrub them everywhere, and
+            // atomically: the old load-modify-save raced token saves and threw
+            // VersionError, leaving the dead token in place to fail again.
+            await Promise.all(invalidTokens.map((t) => detachFirebaseDeviceTokenEverywhere(t)));
+            logger.info(`FCM pruned ${invalidTokens.length} dead token(s) for ${ownerType}:${ownerId}`);
         }
         logger.info(
             `FCM push sent to ${ownerType}:${ownerId} (${platform || 'all'}). Success=${response.successCount}, Failure=${response.failureCount}`
@@ -722,42 +802,31 @@ export const notifyOwnersSafely = async (targets = [], payload = {}) => {
 };
 
 /**
- * An alert that needs BOTH action buttons and delivery on locked-down ROMs.
+ * The seller/delivery new-order alert (type new_order).
  *
- * These two requirements cannot be met by one FCM message, which is the trap a
- * single "hybrid" message fell into:
+ * A message carrying a notification block is rendered by Android itself while
+ * the app is in the background, and the app's handler is never called -- so the
+ * full-screen new-order overlay cannot open. This alert is therefore sent as a
+ * single data-only message with android.priority high, and the app draws both
+ * the overlay and its own notification from `data`.
  *
- *  - A message carrying a notification block is rendered by Android itself, and
- *    the app's background handler is never called. FCM's notification block has
- *    no concept of action buttons, so Accept/Reject cannot exist on it.
- *  - A data-only message DOES reach the handler, which can build a rich
- *    notification with Accept/Reject — but delivering it requires Android to
- *    start the app process, which Vivo, Oppo and Xiaomi refuse without
- *    Autostart. There the message is accepted and silently dropped.
- *
- * So both are sent. On a healthy device the data-only message arrives, the
- * handler posts the rich notification and cancels the plain one by its tag, and
- * the user sees exactly one alert with buttons. On a restricted ROM the
- * data-only message goes nowhere and the plain one is all that renders — no
- * buttons, but the order is not missed, which is the outcome that matters.
- *
- * The tag is the contract that keeps a healthy device from showing two: the app
- * cancels id 0 with this tag. Change it here and the app must change with it.
+ * Trade-off accepted: on ROMs that refuse to start the app without Autostart
+ * (some Vivo/Oppo/Xiaomi), a data-only message is dropped. The apps should ask
+ * for Autostart / battery-optimisation exemption; the socket event and the
+ * /orders polling fallback still surface the order once the app is opened.
  */
 export const notifyOwnersActionableAlert = async (targets = [], payload = {}) => {
-    const { androidTag, androidChannelId, ...rest } = payload;
-
-    // Notification leg FIRST, data-only second — the order matters.
+    // ONE data-only message, priority high, every value a string.
     //
-    // The app cancels the plain copy by tag when its handler runs. Sending
-    // data-only first meant the handler cancelled a notification that had not
-    // arrived yet, and the plain copy then appeared afterwards and stayed —
-    // leaving two alerts on screen instead of one, on exactly the devices that
-    // were working correctly.
+    // The two-message scheme above is retired. Its notification leg was the
+    // problem: with the app in the background Android renders a message that
+    // has a notification block on its own and never calls the app's handler,
+    // so the seller/delivery new-order overlay never opened -- the user saw a
+    // plain notification instead. The apps now raise the overlay (and their
+    // own notification) from the data-only message alone.
     //
-    // This way the plain copy is posted first, and the handler cancels
-    // something that actually exists.
-    await notifyOwnersSafely(targets, { ...rest, androidTag, androidChannelId });
-
+    // title/body are dropped from the top level so nothing can build a
+    // notification block from them; callers carry them inside `data`.
+    const { androidTag, androidChannelId, title, body, notification, ...rest } = payload;
     return notifyOwnersSafely(targets, { ...rest, dataOnly: true });
 };

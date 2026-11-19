@@ -25,6 +25,16 @@ const refreshTokenSchema = new mongoose.Schema(
         expiresAt: {
             type: Date,
             required: true
+        },
+        /**
+         * Set when this token was rotated: the token issued in its place. Until
+         * expiresAt (now a short grace window) a refresh that still presents
+         * this token is answered with that same successor instead of failing,
+         * so calls already in flight during a rotation do not log the user out.
+         */
+        replacedBy: {
+            type: String,
+            default: null
         }
     },
     {

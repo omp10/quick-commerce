@@ -563,23 +563,13 @@ export async function notifyRestaurantNewOrder(orderDoc) {
     if (orderDoc.customerName) bodyText += `\nCustomer: ${orderDoc.customerName}`;
     if (addressStr) bodyText += `\nAddress: ${addressStr}`;
 
-    // Two messages, not one — see notifyOwnersActionableAlert.
-    //
-    // Accept/Reject can only be attached by the app itself, and the app is only
-    // called for a data-only message. Blending both into a single message with a
-    // notification block silently removed the buttons, because Android renders
-    // such a message and never wakes the handler that would have added them.
+    // One data-only message, priority high, no notification block — see
+    // notifyOwnersActionableAlert. With a notification block Android renders the
+    // push itself while the app is in the background, and the seller app's
+    // new-order overlay never opens. title/body travel inside data.
     await notifyOwnersActionableAlert(
       [{ ownerType: "RESTAURANT", ownerId: orderDoc.restaurantId }],
       {
-        title: "New order received",
-        body: bodyText,
-        androidTag: `order_${orderDoc._id?.toString?.() || ""}`,
-        // The channel the restaurant app actually creates. The service default
-        // is the rider app's new-order channel, which does not exist here —
-        // Android silently demotes an unknown channel to low importance, so the
-        // alert would arrive without sound or a heads-up even once it displayed.
-        androidChannelId: "new_order_channel",
         data: {
           type: "new_order",
           title: "New order received",

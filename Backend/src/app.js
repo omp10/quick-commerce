@@ -10,6 +10,7 @@ import shareLinksRoutes from './modules/food/public/shareLinks.routes.js';
 import errorHandler from './middleware/errorHandler.js';
 import { apiRateLimiter } from './middleware/rateLimit.js';
 import { responseTimeLogger } from './middleware/responseTimeLogger.js';
+import { publicMediaUrls } from './middleware/publicMediaUrls.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { healthCheck } from './config/health.js';
 import { config } from './config/env.js';
@@ -70,6 +71,9 @@ app.use('/api', apiRateLimiter);
 
 // Optional: log API response time (method, path, status, duration) - no sensitive data
 app.use('/api', responseTimeLogger);
+
+// Media URLs in responses -> public https origin, never /uploads/... or :5000.
+app.use('/api', publicMediaUrls);
 
 // API Routes
 app.use('/api', routes);

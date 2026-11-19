@@ -1601,8 +1601,11 @@ export async function processRefund(req, res, next) {
                     image: 'https://i.ibb.co/5GzXz7r/Switcheats-Brand-Image.png',
                     data: {
                         type: 'refund_processed',
-                        orderId: String(order.orderId),
-                        orderMongoId: String(order._id)
+                        // Same id every other user push carries, so a tap opens
+                        // the order screen; the display number goes separately.
+                        orderId: String(order._id),
+                        orderMongoId: String(order._id),
+                        orderDisplayId: String(order.orderId || order.order_id || '')
                     }
                 }
             );

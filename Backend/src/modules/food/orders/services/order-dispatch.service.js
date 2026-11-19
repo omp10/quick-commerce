@@ -506,12 +506,13 @@ export async function tryAutoAssign(orderId, options = {}) {
           for (const p of reofferEligible) {
             await notifyOwnersActionableAlert(
               [{ ownerType: 'DELIVERY_PARTNER', ownerId: p.partnerId }],
+              // Data-only (see notifyOwnersActionableAlert): title/body ride in data.
               {
-                title: 'New order available!',
-                body: `Order #${order.order_id || order._id} is still available. Tap to accept.`,
-                androidTag: `order_${order._id.toString()}`,
-                androidChannelId: 'new_orders_v2',
-                data: { ...basePush, pickupDistanceKm: s(p.distanceKm ?? '') },
+                data: {
+                  ...basePush,
+                  body: `Order #${order.order_id || order._id} is still available. Tap to accept.`,
+                  pickupDistanceKm: s(p.distanceKm ?? ''),
+                },
               },
             );
           }
@@ -560,27 +561,10 @@ export async function tryAutoAssign(orderId, options = {}) {
         for (const p of eligible) {
           await notifyOwnersActionableAlert(
             [{ ownerType: 'DELIVERY_PARTNER', ownerId: p.partnerId }],
-            {
-              title: 'New order available!',
-              body: `Order #${order.order_id || order._id} is available. You have ${Math.round(DRIVER_ACCEPT_WINDOW_MS / 1000)} seconds to accept!`,
-              // Two messages â€” see notifyOwnersActionableAlert.
-              //
-              // This alert needs the app's own full-screen UI (which only a
-              // data-only message can trigger) AND delivery on ROMs that refuse
-              // to start the app (which only a notification block achieves).
-              // Blending them into one message quietly lost the first: Android
-              // renders a message that has a notification block and never calls
-              // the handler that would have raised the overlay.
-              //
-              // The tag is the contract with the app (cancel(0, tag:) in
-              // fcm_service.dart) â€” change one and you must change the other.
-              androidTag: `order_${order._id.toString()}`,
-              // Must match a channel the delivery app actually creates: Android
-              // silently demotes an unknown channel id to low importance, which
-              // on the device looks exactly like the push never arriving.
-              androidChannelId: 'new_orders_v2',
-              data: { ...basePush, pickupDistanceKm: s(p.distanceKm ?? '') },
-            }
+            // One data-only message, no notification block -- see
+            // notifyOwnersActionableAlert. A notification block makes Android
+            // render the push itself in the background and the overlay never opens.
+            { data: { ...basePush, pickupDistanceKm: s(p.distanceKm ?? '') } }
           );
         }
       } catch (err) {

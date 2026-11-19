@@ -66,6 +66,13 @@ export const config = {
         || (process.env.NODE_ENV === 'production' ? '/var/www/uploads' : 'uploads'),
     uploadBaseUrl: sanitizeUploadBaseUrl(process.env.UPLOAD_BASE_URL)
         || (process.env.NODE_ENV === 'production' ? '/uploads' : '/uploads'),
+    /**
+     * Public HTTPS origin that serves /uploads (e.g. https://api.example.com), with
+     * no port. Every media URL in API responses is rewritten onto it so the apps
+     * never see /uploads/... relative paths or http://host:5000 origins.
+     * Unset: derived from the request host, forced to https.
+     */
+    publicMediaBaseUrl: sanitizeUploadBaseUrl(process.env.PUBLIC_MEDIA_BASE_URL).replace(/\/uploads$/i, ''),
     uploadMaxFileSizeBytes: Number(process.env.UPLOAD_MAX_FILE_SIZE_MB || 5) * 1024 * 1024,
     uploadRateLimitWindowMinutes: Number(process.env.UPLOAD_RATE_LIMIT_WINDOW || 15),
     uploadRateLimitMax: Number(process.env.UPLOAD_RATE_LIMIT_MAX || 60),

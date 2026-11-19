@@ -409,6 +409,9 @@ apiClient.interceptors.response.use(
       if (newAccessToken) {
         try {
           localStorage.setItem(`${module}_accessToken`, newAccessToken);
+          // The server rotates refresh tokens; the old one dies seconds later.
+          const newRefreshToken = data?.data?.refreshToken || data?.refreshToken;
+          if (newRefreshToken) localStorage.setItem(`${module}_refreshToken`, newRefreshToken);
           // Dispatch a custom event specifically for the module that refreshed
           window.dispatchEvent(new CustomEvent("authRefreshed", { 
             detail: { module, token: newAccessToken } 
