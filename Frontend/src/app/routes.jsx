@@ -65,6 +65,7 @@ const RootEntryRoute = () => {
 
 const AdminRouter = lazy(() => import('../modules/Food/components/admin/AdminRouter'))
 const SellerRouter = lazy(() => import('../modules/Food/components/restaurant/RestaurantRouter'))
+const DeleteAccountPage = lazy(() => import('./DeleteAccountPage'))
 
 /**
  * Sends the old /food/restaurant/* addresses to /seller/*.
@@ -143,6 +144,16 @@ const AppRoutes = () => {
         }
       />
       
+      {/* Public account-deletion page: the URL listed in Google Play. */}
+      <Route
+        path="/delete-account"
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <DeleteAccountPage />
+          </Suspense>
+        }
+      />
+
       {/* Dynamic intercept redirects for bare paths (accessed programmatically) */}
       <Route path="/user/*" element={<RedirectToFood />} />
       <Route path="/restaurant/*" element={<RedirectToSeller />} />

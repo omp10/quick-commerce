@@ -12,6 +12,8 @@ const QcHome = lazy(() => import("@food/pages/user/qc/QcHome"))
 const QcCategories = lazy(() => import("@food/pages/user/qc/QcCategories"))
 const QcCategoryListing = lazy(() => import("@food/pages/user/qc/QcCategoryListing"))
 const QcSearch = lazy(() => import("@food/pages/user/qc/QcSearch"))
+const QcOrders = lazy(() => import("@food/pages/user/qc/QcOrders"))
+const QcProfile = lazy(() => import("@food/pages/user/qc/QcProfile"))
 import { QC_UI } from "@food/qcFlag"
 const Dining = lazy(() => import("@food/pages/user/Dining"))
 const DiningRestaurants = lazy(() => import("@food/pages/user/DiningRestaurants"))
@@ -138,7 +140,7 @@ export default function UserRouter() {
             path="orders"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/food/user/auth/login">
-                <Orders />
+                {QC_UI ? <QcOrders /> : <Orders />}
               </ProtectedRoute>
             }
           />
@@ -185,7 +187,7 @@ export default function UserRouter() {
             path="profile"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/food/user/auth/login">
-                <Profile />
+                {QC_UI ? <QcProfile /> : <Profile />}
               </ProtectedRoute>
             }
           />

@@ -13,7 +13,7 @@ import {
 
 const SETTINGS_KEY = 'food_business_settings';
 const DEFAULT_MODULE_POWER_SCANNING = {
-  user: { themeColor: "#FA0272", fontFamily: "Poppins" },
+  user: { themeColor: "#14A39C", fontFamily: "Poppins" },
   restaurant: { themeColor: "#2563EB", fontFamily: "Poppins" },
   delivery: { themeColor: "#00B761", fontFamily: "Poppins" },
 };

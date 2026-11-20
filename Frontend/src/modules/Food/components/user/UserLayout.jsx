@@ -204,7 +204,8 @@ export default function UserLayout() {
     normalizedPath === "" // Handle empty string case for root relative to /food
 
   // The quick-commerce home draws its own header and bottom nav.
-  const isQcHome = QC_UI && (normalizedPath === "/user" || normalizedPath === "/" || normalizedPath === "")
+  // (Name kept: it now covers every QC screen that would otherwise get the old chrome.)
+  const isQcHome = QC_UI && (normalizedPath === "/user" || normalizedPath === "/" || normalizedPath === "" || isProfileRoot)
 
   const isUnder250 = normalizedPath === "/under-250" || normalizedPath === "/user/under-250"
 

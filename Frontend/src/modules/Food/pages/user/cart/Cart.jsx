@@ -6,6 +6,14 @@ import { motion, AnimatePresence } from "framer-motion"
 import confetti from "canvas-confetti"
 
 import AnimatedPage from "@food/components/user/AnimatedPage"
+import { QC_UI } from "@food/qcFlag"
+
+// Quick-commerce look: the cart is themed through --module-theme-color/-rgb,
+// so pointing those at the Appzeto brand restyles every themed button and
+// highlight on this page without touching the order/payment logic.
+const QC_THEME_VARS = QC_UI
+  ? { "--module-theme-color": "#14a39c", "--module-theme-rgb": "20,163,156" }
+  : undefined
 import { Button } from "@food/components/ui/button"
 import { useCart } from "@food/context/CartContext"
 import { useProfile } from "@food/context/ProfileContext"
@@ -2447,7 +2455,7 @@ export default function Cart() {
   // Empty cart state - but don't show if order success or placing order modal is active
   if (cart.length === 0 && !showOrderSuccess && !showPlacingOrder) {
     return (
-      <AnimatedPage className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a]">
+      <AnimatedPage className={`min-h-screen dark:bg-[#0a0a0a] ${QC_UI ? "bg-qc-bg font-[Poppins]" : "bg-gray-50"}`} style={QC_THEME_VARS}>
         <div className="bg-white dark:bg-[#1a1a1a] border-b dark:border-gray-800 sticky top-0 z-10">
           <div className="flex items-center gap-3 px-4 py-3">
             <Button 
@@ -2462,20 +2470,22 @@ export default function Cart() {
           </div>
         </div>
         <div className="flex flex-col items-center justify-center py-20 px-4">
-          <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <Utensils className="h-10 w-10 text-gray-400" />
+          <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-4 ${QC_UI ? "bg-qc-brand-soft" : "bg-gray-100"}`}>
+            {QC_UI ? <ShoppingCart className="h-10 w-10 text-qc-brand" /> : <Utensils className="h-10 w-10 text-gray-400" />}
           </div>
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-1">Your cart is empty</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 text-center">Add items from a restaurant to start a new order</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 text-center">
+            {QC_UI ? "Add groceries and essentials to get them delivered in minutes" : "Add items from a restaurant to start a new order"}
+          </p>
           <Link to="/user">
             <Button
               className="text-white border-0"
               style={{
-                background: "linear-gradient(135deg, rgba(var(--module-theme-rgb,250,2,114),0.9), var(--module-theme-color,#FA0272))",
-                boxShadow: "0 8px 18px rgba(var(--module-theme-rgb,250,2,114),0.25)",
+                background: "linear-gradient(135deg, rgba(var(--module-theme-rgb,20,163,156),0.9), var(--module-theme-color,#14A39C))",
+                boxShadow: "0 8px 18px rgba(var(--module-theme-rgb,20,163,156),0.25)",
               }}
             >
-              Browse Restaurants
+              {QC_UI ? "Start shopping" : "Browse Restaurants"}
             </Button>
           </Link>
         </div>
@@ -2484,10 +2494,46 @@ export default function Cart() {
   }
 
   return (
-    <div className="relative min-h-screen bg-slate-50 dark:bg-[#0a0a0a]">
+    <div className={`relative min-h-screen dark:bg-[#0a0a0a] ${QC_UI ? "bg-qc-bg font-[Poppins]" : "bg-slate-50"}`} style={QC_THEME_VARS}>
+      {QC_UI ? (
+        <div className="sticky top-0 z-20 border-b border-qc-line bg-white">
+          <div className="mx-auto flex h-14 max-w-3xl items-center gap-2 px-2">
+            <button type="button" onClick={handleBack} aria-label="Back" className="flex h-10 w-10 items-center justify-center rounded-full text-qc-ink active:bg-qc-bg">
+              <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
+            </button>
+            <div className="min-w-0 flex-1 leading-tight">
+              <h1 className="truncate text-base font-extrabold text-qc-ink">Checkout</h1>
+              <p className="truncate text-[11px] text-qc-muted">{restaurantName}</p>
+            </div>
+            <button type="button" onClick={handleShare} aria-label="Share cart" className="flex h-10 w-10 items-center justify-center rounded-full text-qc-ink active:bg-qc-bg">
+              <Share2 className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="mx-auto max-w-3xl px-3 pb-3">
+            <button
+              type="button"
+              onClick={() => setShowAddressSheet(true)}
+              className="flex w-full items-center gap-3 rounded-2xl bg-qc-brand-soft px-3 py-2.5 text-left"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-qc-brand">
+                <Clock className="h-[18px] w-[18px]" strokeWidth={2.5} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-extrabold text-qc-ink">Delivery in {/^\d+$/.test(String(headerDeliveryTime).trim()) ? `${String(headerDeliveryTime).trim()} mins` : headerDeliveryTime}</span>
+                <span className="block truncate text-[11px] text-qc-muted">
+                  To <span className="font-semibold text-qc-ink">{headerAddressLabel}</span>
+                  {headerAddressText ? ` · ${headerAddressText}` : ""}
+                </span>
+              </span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-qc-ink" />
+            </button>
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Header */}
       <div className="sticky top-0 z-20 flex-shrink-0 text-white">
-        <div style={{ backgroundColor: "var(--module-theme-color, #FA0272)" }}>
+        <div style={{ backgroundColor: "var(--module-theme-color, #14A39C)" }}>
           <div className="max-w-7xl mx-auto px-3 md:px-6 pt-4 pb-4 md:pt-5 md:pb-5">
             <div className="flex items-start gap-2.5">
               <Button
@@ -2530,7 +2576,7 @@ export default function Cart() {
         {/* Transition curve: Downward green corners effect */}
         <div 
           className="h-5 md:h-6 w-full relative"
-          style={{ backgroundColor: "var(--module-theme-color, #FA0272)" }}
+          style={{ backgroundColor: "var(--module-theme-color, #14A39C)" }}
         >
           <div 
             className="absolute top-0 left-0 w-full bg-slate-50 dark:bg-[#0a0a0a] rounded-t-[1.75rem] md:rounded-t-[2rem]" 
@@ -2538,12 +2584,14 @@ export default function Cart() {
           />
         </div>
       </div>
+      </>
+      )}
 
       {!canPlaceOrder && cart.length > 0 && (
         <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 px-4 md:px-6 py-2.5">
           <div className="max-w-7xl mx-auto">
             <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-              {restaurantName} is currently offline. You can keep items in your cart, but checkout will open once the restaurant is back online.
+              {restaurantName} is currently offline. You can keep items in your cart, but checkout will open once the {QC_UI ? "store" : "restaurant"} is back online.
             </p>
           </div>
         </div>
@@ -2576,7 +2624,12 @@ export default function Cart() {
                 <div className="space-y-3 md:space-y-4">
                   {cart.map((item) => (
                     <div key={item.id} className="flex items-start gap-3 md:gap-4">
-                      {/* Veg/Non-veg indicator */}
+                      {QC_UI ? (
+                        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-qc-line bg-white">
+                          {item.image ? <img src={item.image} alt="" loading="lazy" className="h-full w-full object-contain" /> : null}
+                        </div>
+                      ) : (
+                      /* Veg/Non-veg indicator */
                       <div
                         className="w-4 h-4 md:w-5 md:h-5 border-2 flex items-center justify-center mt-1 flex-shrink-0"
                         style={{ borderColor: item.foodType === 'Veg' || item.isVeg === true ? "#16a34a" : "#dc2626" }}
@@ -2586,6 +2639,7 @@ export default function Cart() {
                           style={{ backgroundColor: item.foodType === 'Veg' || item.isVeg === true ? "#16a34a" : "#dc2626" }}
                         />
                       </div>
+                      )}
 
                       <div className="flex-1 min-w-0">
                         <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200 leading-tight">{item.name}</p>
@@ -2596,23 +2650,27 @@ export default function Cart() {
 
                       <div className="flex items-center gap-3 md:gap-4">
                         {/* Quantity controls */}
-                        <div className="flex items-center gap-1 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#141414] px-1 py-0.5">
+                        <div className={QC_UI
+                          ? "flex h-8 items-center gap-1 rounded-lg bg-qc-brand px-1 text-white"
+                          : "flex items-center gap-1 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#141414] px-1 py-0.5"}>
                           <button
                             type="button"
-                            className="h-5 w-5 flex items-center justify-center text-gray-700 dark:text-gray-200 hover:opacity-70"
+                            aria-label="Remove one"
+                            className={QC_UI ? "h-7 w-6 flex items-center justify-center" : "h-5 w-5 flex items-center justify-center text-gray-700 dark:text-gray-200 hover:opacity-70"}
                             onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           >
-                            <Minus className="h-3 w-3" />
+                            <Minus className="h-3 w-3" strokeWidth={QC_UI ? 3 : 2} />
                           </button>
-                          <span className="text-sm font-semibold text-gray-900 dark:text-white min-w-[14px] text-center tabular-nums">
+                          <span className={QC_UI ? "text-sm font-bold min-w-[16px] text-center tabular-nums" : "text-sm font-semibold text-gray-900 dark:text-white min-w-[14px] text-center tabular-nums"}>
                             {item.quantity}
                           </span>
                           <button
                             type="button"
-                            className="h-5 w-5 flex items-center justify-center text-gray-700 dark:text-gray-200 hover:opacity-70"
+                            aria-label="Add one"
+                            className={QC_UI ? "h-7 w-6 flex items-center justify-center" : "h-5 w-5 flex items-center justify-center text-gray-700 dark:text-gray-200 hover:opacity-70"}
                             onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           >
-                            <Plus className="h-3 w-3" />
+                            <Plus className="h-3 w-3" strokeWidth={QC_UI ? 3 : 2} />
                           </button>
                         </div>
 
@@ -2627,7 +2685,9 @@ export default function Cart() {
                                 )}
                               </span>
                               <div className="flex items-center gap-1 justify-end">
-                                <span className="inline-flex items-center rounded-full border border-[#FA0272] bg-[#FA0272]/10 px-2 py-0.5 text-xs font-bold text-[#FA0272] tabular-nums">
+                                <span className={QC_UI
+                                  ? "inline-flex items-center rounded-full border border-qc-brand bg-qc-brand-soft px-2 py-0.5 text-xs font-bold text-qc-brand-dark tabular-nums"
+                                  : "inline-flex items-center rounded-full border border-[#14A39C] bg-[#14A39C]/10 px-2 py-0.5 text-xs font-bold text-[#14A39C] tabular-nums"}>
                                   {RUPEE_SYMBOL}
                                   {((item.price || 0) * (item.quantity || 1)).toFixed(0)}
                                 </span>
@@ -2664,9 +2724,11 @@ export default function Cart() {
                     }`}
                   >
                     <Pencil className="h-3.5 w-3.5" />
-                    {note.trim() ? "Edit cooking requests" : "Cooking requests"}
+                    {QC_UI
+                      ? (note.trim() ? "Edit note" : "Add a note")
+                      : (note.trim() ? "Edit cooking requests" : "Cooking requests")}
                   </button>
-                  <button
+                  {!QC_UI && <button
                     type="button"
                     onClick={() => setSendCutlery(!sendCutlery)}
                     className={`flex items-center gap-1.5 shrink-0 rounded-full border px-3 py-2 text-[12px] font-semibold ${
@@ -2677,11 +2739,11 @@ export default function Cart() {
                   >
                     <Square className={`h-3.5 w-3.5 ${sendCutlery ? "" : "fill-current"}`} />
                     {sendCutlery ? "Send cutlery" : "No cutlery"}
-                  </button>
+                  </button>}
                 </div>
                 {note.trim() ? (
                   <p className="mt-3 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300">Cooking note:</span> {note.trim()}
+                    <span className="font-semibold text-gray-700 dark:text-gray-300">{QC_UI ? "Note:" : "Cooking note:"}</span> {note.trim()}
                   </p>
                 ) : null}
               </div>
@@ -2690,7 +2752,7 @@ export default function Cart() {
               {suggestedAddons.length > 0 && (
                 <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-4 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-800">
                   <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400 mb-3">
-                    Complete your meal
+                    {QC_UI ? "You might have missed" : "Complete your meal"}
                   </p>
                   {loadingAddons ? (
                     <div className="flex gap-3 md:gap-4 overflow-x-auto pb-2 -mx-4 md:-mx-6 px-4 md:px-6 scrollbar-hide">
@@ -2780,7 +2842,7 @@ export default function Cart() {
                 onClick={() => setShowOffersView(true)}
                 className={`w-full bg-white dark:bg-[#1a1a1a] rounded-2xl border shadow-sm px-4 py-3.5 flex items-center gap-3 text-left ${
                   appliedCoupon
-                    ? "border-[#FA0272]/30 dark:border-[#FA0272]/40"
+                    ? "border-[#14A39C]/30 dark:border-[#14A39C]/40"
                     : "border-slate-100 dark:border-gray-800"
                 }`}
               >
@@ -2789,15 +2851,15 @@ export default function Cart() {
                     ? "bg-pink-50 dark:bg-pink-950/40"
                     : "bg-emerald-50 dark:bg-emerald-950/40"
                 }`}>
-                  <Tag className={`h-4 w-4 ${appliedCoupon ? "text-[#FA0272]" : "text-emerald-600"}`} />
+                  <Tag className={`h-4 w-4 ${appliedCoupon ? "text-[#14A39C]" : "text-emerald-600"}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold ${appliedCoupon ? "text-[#FA0272]" : "text-gray-900 dark:text-white"}`}>
+                  <p className={`text-sm font-semibold ${appliedCoupon ? "text-[#14A39C]" : "text-gray-900 dark:text-white"}`}>
                     {appliedCoupon
                       ? `'${appliedCoupon.code}' applied`
                       : "Payment offers & more"}
                   </p>
-                  <p className={`text-xs mt-0.5 truncate ${appliedCoupon ? "text-[#FA0272]/80 font-medium" : "text-gray-500 dark:text-gray-400"}`}>
+                  <p className={`text-xs mt-0.5 truncate ${appliedCoupon ? "text-[#14A39C]/80 font-medium" : "text-gray-500 dark:text-gray-400"}`}>
                     {appliedCoupon
                       ? `You saved ${RUPEE_SYMBOL}${discount.toFixed(0)} on this order`
                       : loadingCoupons
@@ -2826,7 +2888,7 @@ export default function Cart() {
                       <span className="whitespace-nowrap">Delivery Modes</span>
                       <span
                         className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide px-1 sm:px-1.5 py-0.5 rounded-full text-white shrink-0"
-                        style={{ backgroundColor: "var(--module-theme-color, #FA0272)" }}
+                        style={{ backgroundColor: "var(--module-theme-color, #14A39C)" }}
                       >
                         New
                       </span>
@@ -2836,7 +2898,7 @@ export default function Cart() {
                       onClick={() => setDeliverySectionTab("instructions")}
                       className={`flex-1 rounded-full px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-semibold whitespace-nowrap transition-colors ${
                         deliverySectionTab === "instructions"
-                          ? "bg-white dark:bg-[#1a1a1a] text-[#FA0272] shadow-sm"
+                          ? "bg-white dark:bg-[#1a1a1a] text-[#14A39C] shadow-sm"
                           : "text-gray-500 dark:text-gray-400"
                       }`}
                     >
@@ -2853,21 +2915,21 @@ export default function Cart() {
                       className="w-full flex items-start gap-3 text-left pb-3 border-b border-gray-100 dark:border-gray-800"
                     >
                       <div className={`mt-0.5 h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                        deliveryMode === "quick" ? "border-[#FA0272]" : "border-gray-300 dark:border-gray-600"
+                        deliveryMode === "quick" ? "border-[#14A39C]" : "border-gray-300 dark:border-gray-600"
                       }`}>
-                        {deliveryMode === "quick" ? <div className="h-2.5 w-2.5 rounded-full bg-[#FA0272]" /> : null}
+                        {deliveryMode === "quick" ? <div className="h-2.5 w-2.5 rounded-full bg-[#14A39C]" /> : null}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                            Quick <Zap className="inline h-3.5 w-3.5 text-[#FA0272] mb-0.5" /> {quickDeliveryTime}
+                            Quick <Zap className="inline h-3.5 w-3.5 text-[#14A39C] mb-0.5" /> {quickDeliveryTime}
                           </p>
-                          <p className={`text-xs font-semibold shrink-0 ${deliveryMode === "quick" ? "text-[#FA0272]" : "text-gray-500"}`}>
+                          <p className={`text-xs font-semibold shrink-0 ${deliveryMode === "quick" ? "text-[#14A39C]" : "text-gray-500"}`}>
                             +{RUPEE_SYMBOL}{configuredQuickDeliveryFee}
                           </p>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          In a hurry? Get food up to 15 mins faster
+                          In a hurry? Get it up to 15 mins faster
                         </p>
                       </div>
                     </button>
@@ -2878,9 +2940,9 @@ export default function Cart() {
                       className="w-full flex items-start gap-3 text-left pt-3"
                     >
                       <div className={`mt-0.5 h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                        deliveryMode === "basic" ? "border-[#FA0272]" : "border-gray-300 dark:border-gray-600"
+                        deliveryMode === "basic" ? "border-[#14A39C]" : "border-gray-300 dark:border-gray-600"
                       }`}>
-                        {deliveryMode === "basic" ? <div className="h-2.5 w-2.5 rounded-full bg-[#FA0272]" /> : null}
+                        {deliveryMode === "basic" ? <div className="h-2.5 w-2.5 rounded-full bg-[#14A39C]" /> : null}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -2992,7 +3054,7 @@ export default function Cart() {
                     type="button"
                     onClick={handleRecipientEditToggle}
                     className="text-xs font-bold uppercase tracking-wide shrink-0"
-                    style={{ color: "var(--module-theme-color, #FA0272)" }}
+                    style={{ color: "var(--module-theme-color, #14A39C)" }}
                   >
                     {isEditingRecipient ? "Save" : "Change"}
                   </button>
@@ -3021,14 +3083,14 @@ export default function Cart() {
                           }))
                         }
                         placeholder="Enter recipient name"
-                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#111111] px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:border-[#FA0272]"
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#111111] px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:border-[#14A39C]"
                       />
                     </div>
                     <div>
                       <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
                         Phone number
                       </label>
-                      <div className="flex items-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#111111] overflow-hidden focus-within:border-[#FA0272]">
+                      <div className="flex items-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#111111] overflow-hidden focus-within:border-[#14A39C]">
                         <span className="px-3 text-sm text-gray-500 border-r border-gray-200 dark:border-gray-700">+91</span>
                         <input
                           type="tel"
@@ -3080,13 +3142,13 @@ export default function Cart() {
                         decimals={2}
                         showDiscountTag={false}
                         plainClassName="text-gray-800 dark:text-gray-200 font-medium tabular-nums"
-                        saleClassName="inline-flex items-center rounded-full border border-[#FA0272] bg-[#FA0272]/10 px-2 py-0.5 text-sm font-bold text-[#FA0272] tabular-nums"
+                        saleClassName="inline-flex items-center rounded-full border border-[#14A39C] bg-[#14A39C]/10 px-2 py-0.5 text-sm font-bold text-[#14A39C] tabular-nums"
                       />
                     </div>
                     {itemDiscountAmount > 0 && (
                       <div className="flex justify-between text-sm font-medium">
-                        <span className="text-[#FA0272] border-b border-dotted border-pink-300">Coupon Discount</span>
-                        <span className="text-[#FA0272]">-{RUPEE_SYMBOL}{itemDiscountAmount.toFixed(2)}</span>
+                        <span className="text-[#14A39C] border-b border-dotted border-pink-300">Coupon Discount</span>
+                        <span className="text-[#14A39C]">-{RUPEE_SYMBOL}{itemDiscountAmount.toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex items-start justify-between gap-3 text-sm">
@@ -3117,8 +3179,8 @@ export default function Cart() {
                     </div>
                     {quickDeliveryFee > 0 && (
                       <div className="flex justify-between text-sm font-semibold">
-                        <span className="text-[#FA0272] border-b border-dotted border-pink-300">Quick Mode</span>
-                        <span className="text-[#FA0272]">{RUPEE_SYMBOL}{quickDeliveryFee.toFixed(2)}</span>
+                        <span className="text-[#14A39C] border-b border-dotted border-pink-300">Quick Mode</span>
+                        <span className="text-[#14A39C]">{RUPEE_SYMBOL}{quickDeliveryFee.toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-sm">
@@ -3186,8 +3248,8 @@ export default function Cart() {
               }
               className="shrink-0 min-w-[132px] px-5 rounded-full text-white font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               style={{
-                backgroundColor: "var(--module-theme-color, #FA0272)",
-                boxShadow: "0 8px 20px rgba(var(--module-theme-rgb, 250,2,114), 0.28)",
+                backgroundColor: "var(--module-theme-color, #14A39C)",
+                boxShadow: "0 8px 20px rgba(var(--module-theme-rgb, 20,163,156), 0.28)",
               }}
             >
               {isPlacingOrder
@@ -3527,7 +3589,7 @@ export default function Cart() {
                   <div className="p-5">
                     <div className="w-10 h-1 bg-gray-200 dark:bg-gray-800 rounded-full mx-auto mb-4" />
                     <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg font-bold text-gray-900 dark:text-white">Cooking requests</h2>
+                      <h2 className="text-lg font-bold text-gray-900 dark:text-white">{QC_UI ? "Add a note" : "Cooking requests"}</h2>
                       <button
                         type="button"
                         onClick={() => setShowCookingSheet(false)}
@@ -3546,7 +3608,7 @@ export default function Cart() {
                         setShowNoteInput(true)
                       }}
                       rows={4}
-                      placeholder="E.g. less spicy, no onions, extra sauce..."
+                      placeholder={QC_UI ? "E.g. ring the bell, leave at the door, check expiry dates..." : "E.g. less spicy, no onions, extra sauce..."}
                       className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#111111] px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:border-[#EB590E] resize-none"
                     />
                     <div className="mt-4 flex gap-2">
@@ -3566,7 +3628,7 @@ export default function Cart() {
                         type="button"
                         onClick={() => setShowCookingSheet(false)}
                         className="flex-1 h-11 rounded-xl text-white text-sm font-bold"
-                        style={{ backgroundColor: "var(--module-theme-color, #FA0272)" }}
+                        style={{ backgroundColor: "var(--module-theme-color, #14A39C)" }}
                       >
                         Save
                       </button>
@@ -3589,7 +3651,7 @@ export default function Cart() {
               >
                 <div
                   className="sticky top-0 z-10 text-white shadow-sm"
-                  style={{ backgroundColor: "var(--module-theme-color, #FA0272)" }}
+                  style={{ backgroundColor: "var(--module-theme-color, #14A39C)" }}
                 >
                   <div className="flex items-center gap-3 px-4 py-3">
                     <Button
@@ -3645,7 +3707,7 @@ export default function Cart() {
                         type="button"
                         onClick={handleApplyCouponCode}
                         className="h-11 px-4 rounded-xl text-white text-sm font-bold shrink-0"
-                        style={{ backgroundColor: "var(--module-theme-color, #FA0272)" }}
+                        style={{ backgroundColor: "var(--module-theme-color, #14A39C)" }}
                       >
                         Apply
                       </button>
