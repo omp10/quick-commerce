@@ -41,14 +41,22 @@ export const toQcProduct = (item, store) => {
  * Returns { status, store, sections, error } where status is one of
  * "locating" | "out_of_zone" | "loading" | "no_store" | "ready" | "error".
  */
+// Every quick-commerce screen reads the same store, so moving between Home,
+// Categories, a category and Search should not refetch it each time.
+const CACHE_TTL_MS = 60_000;
+let cache = null; // { key, at, store, sections }
+const cacheKey = (zoneId, lat, lng) =>
+  `${zoneId}|${Number(lat).toFixed(3)}|${Number(lng).toFixed(3)}`;
+
 export default function useQcStore() {
   const { effectiveLocation, zoneId, zoneLoading, isOutOfService } = useDeliveryLocation();
   const lat = effectiveLocation?.latitude;
   const lng = effectiveLocation?.longitude;
 
-  const [store, setStore] = useState(null);
-  const [sections, setSections] = useState([]);
-  const [status, setStatus] = useState("locating");
+  const fresh = cache && cache.key === cacheKey(zoneId, lat, lng) && Date.now() - cache.at < CACHE_TTL_MS ? cache : null;
+  const [store, setStore] = useState(fresh?.store ?? null);
+  const [sections, setSections] = useState(fresh?.sections ?? []);
+  const [status, setStatus] = useState(fresh ? "ready" : "locating");
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -56,6 +64,14 @@ export default function useQcStore() {
     if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng)) || (!lat && !lng)) { setStatus("no_location"); return; }
     if (isOutOfService) { setStatus("out_of_zone"); return; }
     if (!zoneId) { setStatus("locating"); return; }
+
+    const key = cacheKey(zoneId, lat, lng);
+    if (cache && cache.key === key && Date.now() - cache.at < CACHE_TTL_MS) {
+      setStore(cache.store);
+      setSections(cache.sections);
+      setStatus(cache.store ? "ready" : "no_store");
+      return;
+    }
 
     let cancelled = false;
     (async () => {
@@ -100,6 +116,7 @@ export default function useQcStore() {
             });
           }
         }
+        cache = { key, at: Date.now(), store: s, sections: out };
         if (!cancelled) { setStore(s); setSections(out); setStatus("ready"); }
       } catch (e) {
         if (!cancelled) { setError(e); setStatus("error"); }

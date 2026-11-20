@@ -9,6 +9,9 @@ import ProtectedRoute from "@food/components/ProtectedRoute"
 // Home & Discovery
 const Home = lazy(() => import("@food/pages/user/Home"))
 const QcHome = lazy(() => import("@food/pages/user/qc/QcHome"))
+const QcCategories = lazy(() => import("@food/pages/user/qc/QcCategories"))
+const QcCategoryListing = lazy(() => import("@food/pages/user/qc/QcCategoryListing"))
+const QcSearch = lazy(() => import("@food/pages/user/qc/QcSearch"))
 import { QC_UI } from "@food/qcFlag"
 const Dining = lazy(() => import("@food/pages/user/Dining"))
 const DiningRestaurants = lazy(() => import("@food/pages/user/DiningRestaurants"))
@@ -118,11 +121,11 @@ export default function UserRouter() {
             }
           />
           <Route path="under-250" element={<Under250 />} />
-          <Route path="categories" element={<Categories />} />
-          <Route path="category/:category" element={<CategoryPage />} />
+          <Route path="categories" element={QC_UI ? <QcCategories /> : <Categories />} />
+          <Route path="category/:category" element={QC_UI ? <QcCategoryListing /> : <CategoryPage />} />
           <Route path="restaurants" element={<Restaurants />} />
           <Route path="restaurants/:slug" element={<RestaurantDetails />} />
-          <Route path="search" element={<SearchResults />} />
+          <Route path="search" element={QC_UI ? <QcSearch /> : <SearchResults />} />
           <Route path="product/:id" element={<ProductDetail />} />
 
           {/* Cart - Now Public */}

@@ -100,7 +100,7 @@ export async function getBusinessSettings(req, res, next) {
         if (!settings) {
             // Create default settings if none exist
             settings = await FoodBusinessSettings.create({
-                companyName: 'Switcheats',
+                companyName: 'Appzeto',
                 email: 'admin@switcheats.com'
             });
         }
@@ -152,7 +152,7 @@ export async function getPowerScanningSettings(req, res, next) {
         let settings = await FoodBusinessSettings.findOne().lean();
         if (!settings) {
             settings = await FoodBusinessSettings.create({
-                companyName: 'Switcheats',
+                companyName: 'Appzeto',
                 email: 'admin@switcheats.com'
             });
         }
@@ -169,7 +169,7 @@ export async function updatePowerScanningSettings(req, res, next) {
         let settings = await FoodBusinessSettings.findOne();
         if (!settings) {
             settings = new FoodBusinessSettings({
-                companyName: 'Switcheats',
+                companyName: 'Appzeto',
                 email: 'admin@switcheats.com'
             });
         }
@@ -188,7 +188,7 @@ export async function getOrderAcceptanceSettings(req, res, next) {
         let settings = await FoodBusinessSettings.findOne();
         if (!settings) {
             settings = await FoodBusinessSettings.create({
-                companyName: 'Switcheats',
+                companyName: 'Appzeto',
                 email: 'admin@switcheats.com'
             });
         }
